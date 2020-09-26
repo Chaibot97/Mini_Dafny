@@ -29,7 +29,8 @@ data BoolExp = BCmp  Comparison
 type Names = [Name]
 
 -- Assertion
-data Assertion = ACmp Comparison
+data Assertion = ATrue | AFalse
+               | ACmp Comparison
                | ANot Assertion
                | ADisj Assertion Assertion
                | AConj Assertion Assertion
@@ -53,3 +54,20 @@ data Program = Program { name  :: Name
                        , post  :: [Assertion]
                        , block :: Block
                        } deriving (Show)
+
+-- An intermediate language that does not have parallel assignment
+data IMPStatement = IAssign Name ArithExp
+                | IWrite Name ArithExp ArithExp
+                | IIf BoolExp IMPBlock IMPBlock
+                | IWhile BoolExp [Assertion] IMPBlock
+                  deriving (Show)
+
+type IMPBlock = [IMPStatement]
+
+-- Loop-free guarded command language
+data GuardedCommand = GCAssert Assertion
+                    | GCAssume Assertion
+                    | GCHavoc  Name
+                    | GCChoice GCBlock GCBlock deriving (Show)
+
+type GCBlock = [GuardedCommand]

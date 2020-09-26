@@ -32,7 +32,7 @@ import Parser.Lexer
     
     "||"        { TokenSymb "||" }
     "&&"        { TokenSymb "&&" }
-
+    "==>"       { TokenSymb "==>" }
     ":="        { TokenSymb ":=" }
     ','         { TokenSymb "," }
     ';'         { TokenSymb ";" }
@@ -46,11 +46,13 @@ import Parser.Lexer
     "program"   { TProgram }
     "is"        { TIs }
 
-    "pre"      {TPre}
-    "post"      {TPost}
-    "==>"       {TokenSymb "==>"}
-    "forall"   {TAll}
-    "exists"   {TExt}
+    "pre"       { TPre }
+    "post"      { TPost }
+    
+    "forall"    { TForall }
+    "exists"    { TExists }
+    "true"      { TTrue }
+    "false"     { TFalse }
 
 
 %left '+' '-'
@@ -130,7 +132,9 @@ boolExp :: { BoolExp }
         {- | '(' boolExp ')' { BParens $2 } -}
 
 assertion :: { Assertion }
-          : comp { ACmp $1 }
+          : "true" { ATrue }
+          | "false" { AFalse }
+          | comp { ACmp $1 }
           | '!' assertion { ANot $2 }
           | assertion "||" assertion { ADisj $1 $3 }
           | assertion "&&" assertion { AConj $1 $3 }
