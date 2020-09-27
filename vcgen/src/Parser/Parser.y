@@ -97,39 +97,34 @@ inv  :: { Assertion }
 
 block :: { Block }
       : list_plus(stmt)   { $1 }
-
-binop :: { Operator }
-     : '+' { Add }
-     | '-' { Sub }
-     | '*' { Mul }
-     | '/' { Div }
-     | '%' { Mod }
  
 arithExp :: { ArithExp }
          : int { Num $1 }
          | name { Var $1 }
          | '-' arithExp { BinOp Sub (Num 0) $2 }
-         | name '[' arithExp ']' { Read $1 $3 }
-         | arithExp binop arithExp { BinOp $2 $1 $3 }
+         | name '[' arithExp ']' { Read (Arr $1) $3 }
+         {- | arithExp binop arithExp { BinOp $2 $1 $3 } -}
+         | arithExp '+' arithExp { BinOp Add $1 $3 }
+         | arithExp '-' arithExp { BinOp Sub $1 $3 }
+         | arithExp '*' arithExp { BinOp Mul $1 $3 }
+         | arithExp '/' arithExp { BinOp Div $1 $3 }
+         | arithExp '%' arithExp { BinOp Mod $1 $3 }
          | '(' arithExp ')'      { $2 }
 {-         | '(' arithExp ')'      { Parens $2 } -}
 
-order :: { Order }
-     : '='  { Eq }
-     | "!=" { Neq }
-     | "<=" { Le }
-     | ">=" { Ge }
-     | '<'  { Lt }
-     | '>'  { Gt }
-
 comp :: { Comparison }
-     : arithExp order arithExp { Comp $2 $1 $3 }
+     : arithExp '=' arithExp { Comp Eq $1 $3 }
+     | arithExp '<' arithExp { Comp Lt $1 $3 }
+     | arithExp '>' arithExp { Comp Gt $1 $3 }
+     | arithExp "!=" arithExp { Comp Neq $1 $3 }
+     | arithExp "<=" arithExp { Comp Le $1 $3 }
+     | arithExp ">=" arithExp { Comp Ge $1 $3 }
 
 boolExp :: { BoolExp }
         : comp { BCmp $1 }
         | '!' boolExp { BNot $2 }
-        | boolExp "||" boolExp { BDisj $1 $3 }
-        | boolExp "&&" boolExp { BConj $1 $3 }
+        | boolExp "||" boolExp { BOp Or $1 $3 }
+        | boolExp "&&" boolExp { BOp And $1 $3 }
         | '(' boolExp ')' { $2 }
         {- | '(' boolExp ')' { BParens $2 } -}
 
@@ -138,11 +133,11 @@ assertion :: { Assertion }
           | "false" { AFalse }
           | comp { ACmp $1 }
           | '!' assertion { ANot $2 }
-          | assertion "||" assertion { ADisj $1 $3 }
-          | assertion "&&" assertion { AConj $1 $3 }
-          | assertion "==>" assertion { AImpl $1 $3 }
-          | "forall" list_plus(name) ',' assertion { AForall $2 $4 }
-          | "exists" list_plus(name) ',' assertion { AExists $2 $4 }
+          | assertion "==>" assertion { AOp Imply $1 $3 }
+          | assertion "||" assertion { AOp Or $1 $3 }
+          | assertion "&&" assertion { AOp And $1 $3 }
+          | "forall" list_plus(name) ',' assertion { AQuant Forall $2 $4 }
+          | "exists" list_plus(name) ',' assertion { AQuant Exists $2 $4 }
           | '(' assertion ')' { $2 }
           {- | '(' assertion ')' { AParens $2} -}
 
