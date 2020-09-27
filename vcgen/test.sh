@@ -1,13 +1,16 @@
 #!/bin/bash
-find ../Benchmarks -name "*.imp" | while read t
+
+suites=(valid invalid)
+for suite in "${suites[@]}"
 do
-    echo Testing file "$t"
-    output=$(cabal run vcgen "$t")
-    if [ "$?" -ne "0" ]
-    then
-        echo "Failed"
-        echo "$output"
+  find ../Benchmarks/$suite -name "*.imp" -not -name "*gcd.imp" | while read t
+  do
+    printf "$t >>> "
+    out=$(./vcgen.sh "$t")
+    if [ ! "$out" = "$suite\n" ]; then
+      echo ok
     else
-        echo "Success"
-    fi 
+      echo failed
+    fi
+  done
 done
