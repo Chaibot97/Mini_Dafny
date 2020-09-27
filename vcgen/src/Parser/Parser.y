@@ -55,12 +55,14 @@ import Parser.Lexer
     "false"     { TFalse }
 
 
-%left '+' '-'
-%left '*' '/' '%'
-
+%right "forall" "exists"
+%left "==>"
 %left "||"
 %left "&&"
 %left '!'
+%nonassoc '=' "!=" '>' '<' "<=" ">="
+%left '+' '-'
+%left '*' '/' '%'
 
 %%
 
