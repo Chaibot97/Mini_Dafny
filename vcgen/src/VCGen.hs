@@ -127,7 +127,6 @@ bool_to_assert :: BoolExp -> Assertion
 bool_to_assert (BCmp cmp) = ACmp cmp
 bool_to_assert (BNot b) = ANot (bool_to_assert b)
 bool_to_assert (BOp op b1 b2) = AOp op (bool_to_assert b1) (bool_to_assert b2)
-bool_to_assert (BOp op b1 b2) = AOp op (bool_to_assert b1) (bool_to_assert b2)
 
 imp_to_gc :: IMPStatement -> NeedFreshNames [GuardedCommand]
 imp_to_gc (IAssign x e) fv =
@@ -290,4 +289,5 @@ main = do
         ints_str = S.toList $ S.map declare_int ints
         vc_assert = printf "(assert %s)" (assert_to_smt vc)
         vc_str = intercalate "\n" (arrs_str ++ ints_str ++ [vc_assert, "(check-sat)"])
+    putStrLn "(set-logic ALL)"
     putStrLn vc_str

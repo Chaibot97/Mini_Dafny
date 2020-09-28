@@ -13,7 +13,7 @@ if [ "$?" -ne "0" ]; then
     echo Failed
     echo "$vc"
 else
-    out=$(echo "$vc" | z3 -in)
+    out=$(echo "$vc" | z3 -in -t:2000)
     if [ "$out" = sat ]; then
         echo invalid
     elif [ "$out" = unsat ]; then
