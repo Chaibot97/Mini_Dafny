@@ -1,0 +1,16 @@
+program min
+  pre 0 < N
+  post forall i, 0 <= i && i < N ==> m <= a[i]
+is
+  i := 0;
+  m := a[0];
+  while i < N
+    inv i <= N
+    inv forall j, 0 <= j && j < i ==> m <= a[j]
+  do
+    if a[i] < m then
+      m := a[i];
+    end
+    i := i + 1;
+  end
+end

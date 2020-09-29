@@ -14,3 +14,17 @@ do
     fi
   done
 done
+
+seq  -f "-" -s "" 80 
+echo "Original Tests"
+
+find ../Benchmarks_ORI -name "*.imp" | while read t
+  do
+    printf "$t >>> "
+    out=$(./vcgen.sh "$t")
+    if [[ $out = "valid" ]]; then
+      echo ok
+    else
+      echo failed
+    fi
+  done

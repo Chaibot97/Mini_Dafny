@@ -1,0 +1,17 @@
+program addition 
+  post y = m + n 
+is
+x := n;
+y := m;
+if n > 0 then
+  z := -1;
+else
+  z := 1;
+end
+while x != 0
+  inv y = m + n - x
+do
+  y := y + z;
+  x := x - z;
+end
+end

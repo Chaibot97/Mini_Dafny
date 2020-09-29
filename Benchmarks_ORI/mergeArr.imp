@@ -1,0 +1,47 @@
+program mergeSortedArrInvalidForNow
+  pre 0 < N1 && 0 < N2
+  pre forall i j, 0 <= i && i <= j && j < N1 ==> a[i] <= a[j]
+  pre forall i j, 0 <= i && i <= j && j < N2 ==> b[i] <= b[j]
+  post forall i j, 0 <= i && i <= j && j < N1+N2 ==> r[i] <= r[j]
+is
+  i := 0;
+  j := 0;
+  k := 0;
+  while i < N1 && j < N2
+    inv 0 <= i && i <= N1 && 0 <= j && j <= N2 && k = i+j
+    inv forall x y, 0 <= x && x <= y && y < N1 ==> a[x] <= a[y]
+    inv forall x y, 0 <= x && x <= y && y < N2 ==> b[x] <= b[y]
+    inv forall x y, 0 <= x && x <= y && y < k ==> r[x] <= r[y]
+    inv forall x y, 0 <= x && x < k && i <= y && y < N1 ==> r[x] <= a[y]
+    inv forall x y, 0 <= x && x < k && j <= y && y < N2 ==> r[x] <= b[y]
+  do
+    if a[i] < b[j] then
+      r[k] := a[i];
+      i := i+1;
+    else
+      r[k] := b[j];
+      j := j+1;
+    end
+    k := k+1;
+  end
+  while i < N1
+    inv 0 <= i && i <= N1 && k = i+j
+    inv forall x y, 0 <= x && x <= y && y < N1 ==> a[x] <= a[y]
+    inv forall x y, 0 <= x && x <= y && y < k ==> r[x] <= r[y]
+    inv forall x y, 0 <= x && x < k && i <= y && y < N1 ==> r[x] <= a[y]
+  do
+    r[k] := a[i];
+    i := i+1;
+    k := k+1;
+  end
+  while j < N2
+    inv 0 <= j && j <= N2 && k = i+j
+    inv forall x y, 0 <= x && x <= y && y < N2 ==> b[x] <= b[y]
+    inv forall x y, 0 <= x && x <= y && y < k ==> r[x] <= r[y]
+    inv forall x y, 0 <= x && x < k && j <= y && y < N2 ==> r[x] <= b[y]
+  do
+    r[k] := b[j];
+    j := j+1;
+    k := k+1;
+  end
+end
