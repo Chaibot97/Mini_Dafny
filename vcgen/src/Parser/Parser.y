@@ -98,12 +98,11 @@ inv  :: { Assertion }
 block :: { Block }
       : list_plus(stmt)   { $1 }
  
-arithExp :: { ArithExp }
+arithExp :: { AExp }
          : int { Num $1 }
          | name { Var $1 }
          | '-' arithExp { BinOp Sub (Num 0) $2 }
          | name '[' arithExp ']' { Read (Arr $1) $3 }
-         {- | arithExp binop arithExp { BinOp $2 $1 $3 } -}
          | arithExp '+' arithExp { BinOp Add $1 $3 }
          | arithExp '-' arithExp { BinOp Sub $1 $3 }
          | arithExp '*' arithExp { BinOp Mul $1 $3 }
@@ -120,11 +119,11 @@ comp :: { Comparison }
      | arithExp "<=" arithExp { Comp Le $1 $3 }
      | arithExp ">=" arithExp { Comp Ge $1 $3 }
 
-boolExp :: { BoolExp }
+boolExp :: { BExp }
         : comp { BCmp $1 }
         | '!' boolExp { BNot $2 }
-        | boolExp "||" boolExp { BOp Or $1 $3 }
-        | boolExp "&&" boolExp { BOp And $1 $3 }
+        | boolExp "||" boolExp { BBinOp Or $1 $3 }
+        | boolExp "&&" boolExp { BBinOp And $1 $3 }
         | '(' boolExp ')' { $2 }
         {- | '(' boolExp ')' { BParens $2 } -}
 
@@ -133,18 +132,18 @@ assertion :: { Assertion }
           | "false" { AFalse }
           | comp { ACmp $1 }
           | '!' assertion { ANot $2 }
-          | assertion "==>" assertion { AOp Imply $1 $3 }
-          | assertion "||" assertion { AOp Or $1 $3 }
-          | assertion "&&" assertion { AOp And $1 $3 }
-          | "forall" list_plus(name) ',' assertion { AQuant Forall $2 $4 }
-          | "exists" list_plus(name) ',' assertion { AQuant Exists $2 $4 }
+          | assertion "==>" assertion { ABinOp Imply $1 $3 }
+          | assertion "||" assertion { ABinOp Or $1 $3 }
+          | assertion "&&" assertion { ABinOp And $1 $3 }
+          | "forall" list_plus(name) ',' assertion { AQ Forall $2 $4 }
+          | "exists" list_plus(name) ',' assertion { AQ Exists $2 $4 }
           | '(' assertion ')' { $2 }
           {- | '(' assertion ')' { AParens $2} -}
 
 stmt :: { Statement }
-     : name ":=" arithExp ';' { Assign $1 $3 }
+     : name ":=" arithExp ';' { Assign ($1,Int) $3 }
      | name ',' name ":=" arithExp ',' arithExp ';' { ParAssign $1 $3 $5 $7 }
-     | name '[' arithExp ']' ":=" arithExp ';' { Write $1 $3 $6 }
+     | name '[' arithExp ']' ":=" arithExp ';' { Assign ($1,IntArr) (Store (Arr $1) $3 $6) }
      | "if" boolExp "then" block "else" block "end" { If $2 $4 $6 }
      | "if" boolExp "then" block "end" { If $2 $4 [] }
      | "while" boolExp list(inv) "do" block "end" { While $2 $3 $5 }
