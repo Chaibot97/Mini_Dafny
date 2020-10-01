@@ -12,12 +12,14 @@ vc=$(cabal -v0 new-run vcgen "$1")
 if [ "$?" -ne "0" ]; then
     echo Failed
     echo "$vc"
+elif [ "$2" == "-v" ]; then
+    echo "$vc"
 else
     out=$(echo "$vc" | z3 -in -t:1000)
     if [ "$out" = sat ]; then
-        echo invalid
+        echo Not verified
     elif [ "$out" = unsat ]; then
-        echo valid
+        echo Verified
     else
         echo Error
         echo "$out"

@@ -10,7 +10,7 @@ instance Show Operator where
   show Add = "+"
   show Sub = "-"
   show Mul = "*"
-  show Div = "/"
+  show Div = "div"
   show Mod = "mod"
 
 data BoolFn = And | Or | Imply

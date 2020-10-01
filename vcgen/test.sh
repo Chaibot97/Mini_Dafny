@@ -7,7 +7,7 @@ do
   do
     printf "$t >>> "
     out=$(./vcgen.sh "$t")
-    if [[ $out = $suite ]]; then
+    if [[ $suite == valid && $out == "Verified" ]] || [[ $suite == invalid && $out == "Not verified" ]]; then
       echo ok
     else
       echo failed
@@ -22,7 +22,7 @@ find ../Benchmarks_ORI -name "*.imp" | while read t
   do
     printf "$t >>> "
     out=$(./vcgen.sh "$t")
-    if [[ $out = "valid" ]]; then
+    if [[ $out = "Verified" ]]; then
       echo ok
     else
       echo failed
