@@ -1,0 +1,12 @@
+program arrElementwiseAdd
+  pre 0 < N
+  post forall i, 0 <= i && i < N ==> r[i] = a[i] + b[i]
+is
+  i := 0;
+  while i < N
+    inv 0 <= i && i <= N
+    inv forall j, 0 <= j && j < i ==> r[j] = a[j] + b[j]
+  do
+    r[i] := a[i] + b[i];
+  end
+end
