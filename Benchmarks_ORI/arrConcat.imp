@@ -1,0 +1,19 @@
+program arrConcat
+  pre 0 < N1 && 0 < N2
+  post forall i, 0 <= i && i < N1 ==> r[i] = a[i]
+  post forall i, N1 <= i && i < N1 + N2 ==> r[i] = b[i]
+is
+  i := 0;
+  while i < N1+N2
+    inv 0 <= i && i <= N1 + N2
+    inv forall j, 0 <= j && j < i && j< N1 ==> r[j] = a[j]
+    inv forall j, N1 <= j && j < i && j< N1+N2 ==> r[j] = b[j]
+  do
+    if i < N1 then
+      r[i] := a[i];
+    else
+      r[i] := b[i];
+    end
+    i := i+1;
+  end
+end
