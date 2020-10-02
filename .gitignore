@@ -1,3 +1,6 @@
+# Project-specific
+*.dfy
+
 dist
 dist-*
 cabal-dev
