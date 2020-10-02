@@ -42,6 +42,7 @@ import Parser.Lexer
     "end"       { TEnd }
     "while"     { TWhile }
     "do"        { TDo }
+    "skip"      { TSkip }
     "inv"       { TInv }
     "program"   { TProgram }
     "is"        { TIs }
@@ -147,6 +148,7 @@ stmt :: { Statement }
      | "if" boolExp "then" block "else" block "end" { If $2 $4 $6 }
      | "if" boolExp "then" block "end" { If $2 $4 [] }
      | "while" boolExp list(inv) "do" block "end" { While $2 $3 $5 }
+     | "skip" ';' { Skip }
 
 {
 

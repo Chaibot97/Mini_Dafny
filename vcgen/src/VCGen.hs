@@ -65,6 +65,7 @@ modified (Assign x _)  = S.singleton (x, Int)
 modified (Write a _ _) = S.singleton (a, IntArr)
 modified (If _ c1 c2)  = S.union (block_modified c1) (block_modified c2)
 modified (While _ _ c) = block_modified c
+modified Skip = S.empty
 
 block_modified :: Block -> S.Set Typed
 block_modified = foldl (\acc s -> S.union acc (modified s)) S.empty
@@ -126,6 +127,7 @@ stmt_to_gc (While b invs c) fv =
         xs = block_modified c
         havoc = map GCHavoc (S.toList xs)
         (gc, fv') = prog_to_gc c fv
+stmt_to_gc Skip fv = ([], fv)
 
 prog_to_gc :: Block -> NeedFreshNames GCBlock
 prog_to_gc = fold_fv stmt_to_gc

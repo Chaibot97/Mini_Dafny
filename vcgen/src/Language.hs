@@ -90,6 +90,7 @@ data Statement = Assign Name AExp
                | ParAssign Name Name AExp AExp
                | If BExp Block Block
                | While BExp [Assertion] Block
+               | Skip
 instance Show Statement where
   show s = intercalate "\n" (show_list s)
 
@@ -110,6 +111,7 @@ show_list (While b invs c) =
   [ "do" ] ++
     indent (showlist_block c) ++
   [ "end" ]
+show_list (Skip) = [ "skip" ]
 
 prefix :: String -> [String] -> [String]
 prefix pre = map (\x -> pre ++ x)
