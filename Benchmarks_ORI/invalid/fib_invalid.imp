@@ -1,0 +1,18 @@
+program fib
+  pre 2 <= n
+  post r[0] = 0
+  post r[1] = 1
+  post forall i, 2 <= i && i <= n ==> r[i] = r[i-1] + r[i-2] 
+is
+  r[0] := 0;
+  r[1] := 1;
+  i := 2;
+  while i <= n
+    inv i <= n + 1
+    inv r[0] = 0 && r[1] = 1
+    inv forall j, 2 <= j && j < i ==> r[j] = r[j-1] + r[j-2]
+  do
+    r[i] := r[i-1] + r[i-2];
+    i := i + 1;
+  end
+end
