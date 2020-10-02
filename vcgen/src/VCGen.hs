@@ -3,7 +3,7 @@ module Main where
 import Language
 import Parser.Parser
 
-import Data.List ( (\\), intercalate )
+import Data.List ( (\\), intercalate, filter, notElem )
 import qualified Data.Set as S ( Set, empty, singleton, insert, union, difference, map, fromList, toList, member ) 
 import Text.Printf ( printf )
 import System.Environment
@@ -13,40 +13,11 @@ import Debug.Trace
 -- A stream of fresh variables
 fresh = map (\i -> "_t" ++ show i) [1..]
 
-nuu :: ([a], [b]) -> ([a], [b]) -> ([a], [b])
-nuu (xs, ys) (xs', ys') = (xs++xs', ys++ys')
-
-nuu_s :: (Ord a, Ord b) => (S.Set a, S.Set b) -> (S.Set a, S.Set b) -> (S.Set a, S.Set b)
-nuu_s (s1, s2) (s1', s2') = (S.union s1 s1', S.union s2 s2')
-
 -- Given a stream of fresh names, consume the first name and
 -- return (a, rest of the names)
---
 -- Inspired by https://stackoverflow.com/a/44802556
--- TODO: Use State Monad and traverse
+-- TODO: Implement using Traversable
 type NeedFreshNames a = [Name] -> (a, [Name])
-
--- Transform surface language into the intermediate language
-stmt_to_imp :: Statement -> NeedFreshNames [IMPStatement]
-stmt_to_imp (Assign x e) fv = ([IAssign x e], fv)
-stmt_to_imp (ParAssign x y ex ey) fv =
-    ([ IAssign vx ex, IAssign vy ey, IAssign x (Var vx), IAssign y (Var vy) ], fv'') where
-        (vx : fv') = fv
-        (vy : fv'') = fv'
-stmt_to_imp (Write a ei ev) fv =
-    ([ IWrite a ei ev ], fv) 
-    -- Alternatively (and perhaps a safer way) we can
-    -- create temporary variables to store values of ei and ev
-    -- ([ IAssign i ei, IAssign v ev, IWrite a (Var i) (Var v)], fv'') where
-    --     (i : fv') = fv
-    --     (v : fv'') = fv'
-stmt_to_imp (If b c1 c2) fv =
-    ([IIf b gc1 gc2], fv'') where
-        (gc1, fv') = prog_to_imp c1 fv
-        (gc2, fv'') = prog_to_imp c2 fv'
-stmt_to_imp (While e inv c) fv =
-    ([IWhile e inv gc], fv') where
-        (gc, fv') = prog_to_imp c fv
 
 fold_fv :: (a -> NeedFreshNames [b]) -> [a] -> NeedFreshNames [b]
 fold_fv f [] fv = ([], fv)
@@ -54,240 +25,219 @@ fold_fv f (x:xs) fv = (y ++ ys, fv'') where
   (y, fv') = f x fv
   (ys, fv'') = fold_fv f xs fv'
 
-prog_to_imp :: Block -> NeedFreshNames [IMPStatement]
-prog_to_imp = fold_fv stmt_to_imp
-
--- Substitute ArithExp new for Var old in ArithExp e, that is, e[new\old]
-subst_v_in_arith :: ArithExp -> Name -> ArithExp -> ArithExp
-subst_v_in_arith new old e = case e of
+-- Substitute AExp |new| for name |old| of type |t| in AExp |e|, that is, e[new\old]
+subst_aexp :: AExp -> Typed -> AExp -> AExp
+subst_aexp new (old,t) e =
+  let subst = subst_aexp new (old,t) in
+  case e of
     Num n -> e
-    Var x -> if x == old then new else e
-    BinOp op e1 e2 -> BinOp op (subst_v_in_arith new old e1) (subst_v_in_arith new old e2)
-    Read r ei      -> Read (subst_v_in_arr new old r) (subst_v_in_arith new old ei)
+    Var x -> case t of {Int -> if x == old then new else e; IntArr -> e}
+    Arr x -> case t of {IntArr -> if x == old then new else e; Int -> e}
+    BinOp op e1 e2 -> BinOp op (subst e1) (subst e2)
+    Read ea ei     -> Read (subst ea) (subst ei)
+    Store ea ei ev -> Store (subst ea) (subst ei) (subst ev)
 
--- Substitute ArithExp new for Var x in ArrExp r, that is, r[new\old]
-subst_v_in_arr :: ArithExp -> Name -> ArrExp -> ArrExp
-subst_v_in_arr new old r = case r of
-    Arr a -> r
-    Store t ei ev -> Store t' ei' ev' where
-        t'  = subst_v_in_arr new old t
-        ei' = subst_v_in_arith new old ei
-        ev' = subst_v_in_arith new old ev
+subst_cmp :: AExp -> Typed -> Comparison -> Comparison
+subst_cmp new (old,t) (Comp ord e1 e2) = let subst = subst_aexp new (old,t) in
+  Comp ord (subst e1) (subst e2)
 
--- Substitute ArrExp new for Arr old in ArithExp e, that is, e[new\old]
-subst_a_in_arith :: ArrExp -> Name -> ArithExp -> ArithExp
-subst_a_in_arith new old e = case e of
-    Num n -> e
-    Var x -> e
-    Read r ei -> Read (subst_a_in_arr new old r) (subst_a_in_arith new old ei)
-    BinOp op e1 e2 -> BinOp op (subst_a_in_arith new old e1) (subst_a_in_arith new old e2)
+subst_bexp :: AExp -> Typed -> BExp -> BExp
+subst_bexp new (old,t) b = let subst = subst_bexp new (old,t) in
+  case b of
+    BCmp c -> BCmp (subst_cmp new (old,t) c)
+    BNot b' -> BNot (subst b')
+    BBinOp op b1 b2 -> BBinOp op (subst b1) (subst b2)
 
--- Substitute ArrExp new for Arr x in ArrExp r, that is, r[new\old]
-subst_a_in_arr :: ArrExp -> Name -> ArrExp -> ArrExp
-subst_a_in_arr new old r = case r of
-    Arr a -> if a == old then new else r
-    Store t ei ev -> Store t' ei' ev' where
-        t'  = subst_a_in_arr new old t
-        ei' = subst_a_in_arith new old ei
-        ev' = subst_a_in_arith new old ev
-
-fmap_cmp :: (ArithExp -> ArithExp) -> Comparison -> Comparison
-fmap_cmp f (Comp ord e1 e2) = Comp ord (f e1) (f e2)
-
-subst_v_in_cmp new old = fmap_cmp (subst_v_in_arith new old)
-subst_a_in_cmp new old =  fmap_cmp (subst_a_in_arith new old)
-
-subst_assert :: Name -> (Name -> ArithExp -> ArithExp) -> Assertion -> Assertion
-subst_assert x f s = case s of
-    ACmp cmp -> ACmp (fmap_cmp (f x) cmp)
-    ANot s   -> ANot (subst_assert x f s)
-    AOp op s1 s2 -> AOp op (subst_assert x f s1) (subst_assert x f s2)
-    AQuant q xs s' -> if elem x xs then s else AQuant q xs (subst_assert x f s')
+subst_assert :: AExp -> Typed -> Assertion -> Assertion
+subst_assert new (old,t) s = let subst = subst_assert new (old,t) in
+  case s of
+    ACmp c -> ACmp (subst_cmp new (old,t) c)
+    ANot s' -> ANot (subst s')
+    ABinOp op b1 b2 -> ABinOp op (subst b1) (subst b2)
+    AQ q xs s' -> AQ q xs s'' where
+      s'' = case t of 
+        Int -> if elem old xs then s' else (subst s')
+        IntArr -> (subst s')
     _ -> s
 
-subst_v_in_assert new old = subst_assert old (subst_v_in_arith new)
-subst_a_in_assert new old = subst_assert old (subst_a_in_arith new)
+modified :: Statement -> S.Set Typed
+modified (Assign x _)  = S.singleton (x, Int)
+modified (Write a _ _) = S.singleton (a, IntArr)
+modified (If _ c1 c2)  = S.union (block_modified c1) (block_modified c2)
+modified (While _ _ c) = block_modified c
+modified Skip = S.empty
 
-modified :: IMPStatement -> ([String], [String])
-modified (IAssign x _)  = ([], [x])
-modified (IWrite a _ _) = ([a], [])
-modified (IIf _ c1 c2)  = nuu (block_modified c1) (block_modified c2)
-modified (IWhile _ _ c) = block_modified c
-
-block_modified :: IMPBlock -> ([String], [String])
-block_modified [] = ([], [])
-block_modified (hd:tl) = nuu (modified hd) (block_modified tl)
+block_modified :: Block -> S.Set Typed
+block_modified = foldl (\acc s -> S.union acc (modified s)) S.empty
 
 conj :: [Assertion] -> Assertion
 conj [] = ATrue
 conj [s] = s
-conj (hd:tl) = (AOp And hd (conj tl))
+conj (hd:tl) = ABinOp And hd (conj tl)
 
-bool_to_assert :: BoolExp -> Assertion
-bool_to_assert (BCmp cmp) = ACmp cmp
-bool_to_assert (BNot b) = ANot (bool_to_assert b)
-bool_to_assert (BOp op b1 b2) = AOp op (bool_to_assert b1) (bool_to_assert b2)
+bexp_to_assert :: BExp -> Assertion
+bexp_to_assert (BCmp c) = ACmp c
+bexp_to_assert (BNot b) = ANot (bexp_to_assert b)
+bexp_to_assert (BBinOp op b1 b2) = ABinOp op b1' b2' where
+  b1' = bexp_to_assert b1
+  b2' = bexp_to_assert b2
 
-imp_to_gc :: IMPStatement -> NeedFreshNames [GuardedCommand]
-imp_to_gc (IAssign x e) fv =
-    -- ([ GCAssign x e], fv)
+stmt_to_gc :: Statement -> NeedFreshNames GCBlock
+stmt_to_gc (Assign x e) fv0 =
     ([ GCAssume (ACmp (Comp Eq v_xf v_x))
-     , GCHavoc x
-     , GCAssume (ACmp (Comp Eq v_x (subst_v_in_arith v_xf x e))) ], fv') where
-        (xf : fv') = fv
+     , GCHavoc (x, Int)
+     , GCAssume (ACmp (Comp Eq v_x (subst_aexp v_xf (x,Int) e))) ], fv1) where
+        (xf : fv1) = fv0
         v_xf = Var xf
         v_x  = Var x
-imp_to_gc (IWrite a ei ev) fv0 =
-      -- forall i, a'[i] == a[i]
-    ([ GCAssume (AQuant Forall [i] (ACmp (Comp Eq (Read (Arr a') (Var i)) (Read (Arr a) (Var i)))))
-      -- havoc a
-     , GCHavocArr a
-      -- forall j, a[j] = (store a' ei' ev')[j], where ei' = ei[a'/a], ev' = ev[a'/a]
-     , GCAssume (AQuant Forall [j]
-        (ACmp (Comp Eq
-          (Read (Arr a) (Var j))
-          (Read (Store (Arr a') ei' ev') (Var j))))) ], fv3) where
+stmt_to_gc (Write a (Var ind) (Var val)) fv0 =
+    ([ GCAssume (arr_equal (Arr a') (Arr a) i)
+     , GCHavoc (a, IntArr)
+     , GCAssume (arr_equal (Arr a) store j) ], fv3) where
         a' : fv1 = fv0
         i : fv2 = fv1
         j : fv3 = fv2
-        ei' = subst_a_in_arith (Arr a') a ei
-        ev' = subst_a_in_arith (Arr a') a ev
-imp_to_gc (IIf b c1 c2) fv =
-    ([ GCChoice (GCAssume b' : gc1) (GCAssume (ANot b') : gc2) ], fv'') where
-        (gc1, fv')  = imp_prog_to_gc c1 fv
-        (gc2, fv'') = imp_prog_to_gc c2 fv'
-        b' = bool_to_assert b
-imp_to_gc (IWhile b invs c) fv = 
-    ([ GCAssert inv ] ++ havoc_int ++ havoc_arr ++ [ GCAssume inv ] ++
+        store = Store (Arr a') (Var ind) (Var val)
+        arr_equal a1 a2 i = AQ Forall [i] (ACmp (Comp Eq (Read a1 (Var i)) (Read a2 (Var i))))
+stmt_to_gc (Write a ei ev) fv0 = 
+    prog_to_gc [ Assign ind ei
+     , Assign val ev
+     , Write a (Var ind) (Var val)] fv2 where
+       ind : fv1 = fv0
+       val : fv2 = fv1
+stmt_to_gc (ParAssign x1 x2 e1 e2) fv0 = (gc, fv3) where
+  v1 : fv1 = fv0
+  v2 : fv2 = fv1
+  (gc, fv3) = prog_to_gc [ Assign v1 e1
+              , Assign v2 e2
+              , Assign x1 (Var v1)
+              , Assign x2 (Var v2) ] fv2
+stmt_to_gc (If b c1 c2) fv =
+    ([ GCChoice (GCAssume bs : gc1) (GCAssume (ANot bs) : gc2) ], fv'') where
+        (gc1, fv')  = prog_to_gc c1 fv
+        (gc2, fv'') = prog_to_gc c2 fv'
+        bs = bexp_to_assert b
+stmt_to_gc (While b invs c) fv = 
+    ([ GCAssert inv ] ++ havoc ++ [ GCAssume inv ] ++
         [ GCChoice 
-            ((GCAssume b') : gc ++ [ GCAssert inv, GCAssume AFalse ])
-            [GCAssume (ANot b')] ], fv') where
+            ((GCAssume bs) : gc ++ [ GCAssert inv, GCAssume AFalse ])
+            [GCAssume (ANot bs)] ], fv') where
+        bs = bexp_to_assert b
         inv = conj invs
-        b' = bool_to_assert b
-        (rs, vs) = block_modified c
-        havoc_int = map GCHavoc vs
-        havoc_arr = map GCHavocArr rs
-        (gc, fv') = imp_prog_to_gc c fv
+        xs = block_modified c
+        havoc = map GCHavoc (S.toList xs)
+        (gc, fv') = prog_to_gc c fv
+stmt_to_gc Skip fv = ([], fv)
 
-imp_prog_to_gc :: [IMPStatement] -> NeedFreshNames [GuardedCommand]
-imp_prog_to_gc = fold_fv imp_to_gc
+prog_to_gc :: Block -> NeedFreshNames GCBlock
+prog_to_gc = fold_fv stmt_to_gc
 
 wp :: GuardedCommand -> Assertion -> NeedFreshNames Assertion
 wp gc q fv =
   -- Uncomment the following line to enable debug messages
-  -- trace (intercalate "\n" ["Command:", show gc, "Message:", msg, "WP:", show qq, "Q:", show q, "\n"])
+  -- trace (intercalate "\n" ["Command:", show gc, "Message:", msg, "WP:", show q', "Q:", show q, "\n"])
   (q', fv') where
     (q', fv', msg) = case gc of
       GCAssert s -> case q of
           ATrue -> (s, fv, "right operand is true")
           _ -> (q', fv', msg) where
-              (q', fv') = (AOp And s q, fv)
+              (q', fv') = (ABinOp And s q, fv)
               msg = ("&& " ++ show s)
       GCAssume AFalse -> (ATrue, fv, "falsehood implies everything")
       GCAssume s -> (q', fv', msg) where
-          (q', fv') = (AOp Imply s q, fv)
+          (q', fv') = (ABinOp Imply s q, fv)
           msg = ("=> " ++ show s)
-      GCHavoc x -> (q', fv', msg) where
+      GCHavoc (x,t) -> (q', fv', msg) where
           v : fv' = fv
-          q' = subst_v_in_assert (Var v) x q
+          v_e = case t of {Int -> Var v; IntArr -> Arr v}
+          q' = subst_assert v_e (x,t) q
           msg = printf "replace %s with %s in\n%s\n" x v (show q) ++ (show q')
-      GCHavocArr a -> (q', fv', msg) where
-          a' : fv' = fv
-          q' = subst_a_in_assert (Arr a') a q
-          msg = printf "replace %s with %s in\n  %s\nwhich becomes\n  %s" a a' (show q) (show q')
       GCChoice gc1 gc2 -> (q', fv'', msg) where
           (q1, fv') = wp_block gc1 q fv
           (q2, fv'') = wp_block gc2 q fv'
-          q' = AOp And q1 q2
+          q' = ABinOp And q1 q2
           msg = printf "left branch\n" ++ (show q1) ++ "\nright branch\n" ++ (show q2)
-      -- GCAssign x e -> (subst_v_in_assert e x q, fv, "assign")
-      -- GCWrite a ei ev -> (subst_a_in_assert (Store (Arr a) ei ev) a q, fv, "write")
 
 split_last :: [a] -> ([a], a)
 split_last l = case reverse l of
   [] -> error "list must be non-empty"
   hd:tl -> (reverse tl, hd)
 
-wp_block :: [GuardedCommand] -> Assertion -> NeedFreshNames Assertion
+wp_block :: GCBlock -> Assertion -> NeedFreshNames Assertion
 wp_block [] q fv = (q, fv)
 wp_block (hd:tl) q0 fv0 = (q2, fv2) where
   (q1, fv1) = wp_block tl q0 fv0
   (q2, fv2) = wp hd q1 fv1
 
--- extract array variables and integer variables from ArithExp
-names :: ArithExp -> (S.Set Name, S.Set Name)
-names (Num _) = (S.empty, S.empty)
-names (Var x) = (S.empty, S.singleton x)
-names (Read r e) = nuu_s (names_arr r) (names e)
-names (BinOp _ e1 e2) = nuu_s (names e1) (names e2)
+infer_a :: AExp -> Typing
+infer_a (Num _) = []
+infer_a (Var x) = [(x, Int)]
+infer_a (Arr x) = [(x, IntArr)]
+infer_a (BinOp _ e1 e2) = infer_a e1 ++ infer_a e2
+infer_a (Read ea ei) = infer_a ea ++ infer_a ei
+infer_a (Store ea ei ev) = infer_a ea ++ infer_a ei ++ infer_a ev
 
--- extract array variables and integer variables from ArrExp
-names_arr :: ArrExp -> (S.Set Name, S.Set Name)
-names_arr (Arr a) = (S.singleton a, S.empty)
-names_arr (Store r ei ev) = nuu_s (names_arr r) (nuu_s (names ei) (names ev))
+infer_c :: Comparison -> Typing
+infer_c (Comp _ e1 e2) = infer_a e1 ++ infer_a e2
 
--- Free variables of types array and int
-free :: Assertion -> (S.Set Name, S.Set Name)
-free (ACmp (Comp _ e1 e2)) = nuu_s (names e1) (names e2)
-free (ANot s) = free s
-free (AOp _ s1 s2) = nuu_s (free s1) (free s2)
-free (AQuant _ xs s) = (S.difference r xs_set, S.difference v xs_set) where
-    (r, v) = free s
-    xs_set = S.fromList xs
-free _ = (S.empty, S.empty)
+infer_b :: BExp -> Typing
+infer_b (BCmp c) = infer_c c
+infer_b (BNot b) = infer_b b
+infer_b (BBinOp _ b1 b2) = infer_b b1 ++ infer_b b2
+infer_b _ = []
 
--- show ArithExp is already in smt syntax
-arith_to_smt :: ArithExp -> String
-arith_to_smt = show
+infer :: Assertion -> Typing
+infer (ACmp c) = infer_c c
+infer (ANot s) = infer s
+infer (ABinOp _ s1 s2) = infer s1 ++ infer s2
+infer (AQ _ xs s) = filter not_captured (infer s) where
+  not_captured (y,Int) = notElem y xs
+  not_captured _ = True
+infer _ = []
 
--- show ArrExp is already in smt syntax
-arr_to_smt :: ArrExp -> String
-arr_to_smt = show
+-- show AExp is already in smt syntax
+aexp_to_smt :: AExp -> String
+aexp_to_smt = show
 
--- Could have used show, but smt syntax does not have !=
+-- smt syntax does not have !=
 cmp_to_smt :: Comparison -> String
-cmp_to_smt (Comp Neq e1 e2) = printf "(not (= %s %s))" (arith_to_smt e1) (arith_to_smt e2)
-cmp_to_smt (Comp ord e1 e2) = printf "(%s %s %s)" (show ord) (arith_to_smt e1) (arith_to_smt e2)
+cmp_to_smt (Comp Neq e1 e2) = printf "(not (= %s %s))" (aexp_to_smt e1) (aexp_to_smt e2)
+cmp_to_smt (Comp ord e1 e2) = printf "(%s %s %s)" (show ord) (aexp_to_smt e1) (aexp_to_smt e2)
 
-assert_to_smt :: Assertion -> String
-assert_to_smt ATrue = "true"
-assert_to_smt AFalse = "false"
-assert_to_smt (ACmp cmp) = cmp_to_smt cmp
-assert_to_smt (ANot s) = "(not " ++ assert_to_smt s ++ ")"
-assert_to_smt (AOp op s1 s2) = printf "(%s %s %s)" op_smt s1_smt s2_smt where
-    op_smt = case op of
-        Or -> "or" 
-        And -> "and"
-        Imply -> "=>"
-    s1_smt = assert_to_smt s1
-    s2_smt = assert_to_smt s2
-assert_to_smt (AQuant q [] s) = assert_to_smt s
-assert_to_smt (AQuant q (x:xs) s) = 
-    let s_xs = AQuant q xs s
-        (arrs, ints) = free s_xs in
-    if elem x ints
-    then printf "(forall ((%s %s)) %s)" x "Int" (assert_to_smt s_xs)
-    else if elem x arrs
-        then printf "(forall ((%s %s)) %s)" x "(Array Int Int)" (assert_to_smt s_xs)
-        else trace (show (AQuant q (x:xs) s)) error (x ++ " not found")
+bexp_to_smt :: BExp -> String
+bexp_to_smt (BCmp c) = cmp_to_smt c
+bexp_to_smt (BNot b) = "(not " ++ bexp_to_smt b ++ ")"
+bexp_to_smt (BBinOp op b1 b2) = printf "(%s %s %s)" (show op) (bexp_to_smt b1) (bexp_to_smt b2)
+
+
+typing_to_str :: Typing -> String
+typing_to_str ts = intercalate " " (map (\(x,t) -> printf "(%s %s)" x (show t)) ts)
+
+to_smt :: Assertion -> String
+to_smt (ACmp c) = cmp_to_smt c
+to_smt (ANot s) = "(not " ++ to_smt s ++ ")"
+to_smt (ABinOp op s1 s2) = printf "(%s %s %s)" (show op) (to_smt s1) (to_smt s2)
+to_smt (AQ q xs s) = printf "(%s (%s) %s)" (show q) xts (to_smt s) where
+  xts = typing_to_str (zip xs (repeat Int))
+to_smt s = show s
+
 
 main :: IO ()
 main = do
-    as <- getArgs
-    prog <- readFile (head as) 
-    let
-        p = parseProg prog
-        fv0 = fresh -- keep around the stream of fresh names
-        (imp, fv1) = prog_to_imp (block p) fv0 -- eliminate parallel assignment
-        (gc, fv2) = imp_prog_to_gc imp fv1
-        (weakest, fv3) = wp_block gc (conj $ post p) fv2
-        vc = (ANot (AOp Imply (conj $ pre p) weakest))
-        (arrs, ints) = free vc -- free variables of types array and int
-        declare_arr = printf "(declare-const %s (Array Int Int))"
-        declare_int = printf "(declare-const %s Int)"
-        arrs_str = S.toList $ S.map declare_arr arrs
-        ints_str = S.toList $ S.map declare_int ints
-        vc_assert = printf "(assert %s)" (assert_to_smt vc)
-        vc_str = intercalate "\n" (arrs_str ++ ints_str ++ [vc_assert, "(check-sat)"])
-    putStrLn "(set-logic ALL)"
-    putStrLn vc_str
+  as <- getArgs
+  prog <- readFile (head as) 
+  let
+    p = parseProg prog
+    fv0 = fresh -- keep around the stream of fresh names
+    (gc, fv1) = prog_to_gc (block p) fv0
+    (weakest, fv2) = wp_block gc (conj $ post p) fv1
+    vc = (ANot (ABinOp Imply (conj $ pre p) weakest))
+    ts = S.toList (S.fromList (infer vc))
+    declare_str :: (Name, Type) -> String
+    declare_str (x,t) = printf "(declare-const %s %s)" x (show t)
+    ds = map declare_str ts
+  -- putStrLn (intercalate "\n" (gcblock_strlist gc))
+  putStrLn "(set-logic ALL)"
+  putStrLn (intercalate "\n" ds)
+  putStrLn ("(assert " ++  to_smt vc ++ ")")
+  putStrLn "(check-sat)"

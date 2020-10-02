@@ -17,6 +17,7 @@ tokens:-
     "else"                              { const TElse }
     "end"                               { const TEnd }
     "while"                             { const TWhile }
+    "skip"                              { const TSkip }
     "inv"                               { const TInv }
     "do"                                { const TDo }
     "program"                           { const TProgram }
@@ -58,6 +59,7 @@ data Token = TokenInt Int
            | TEnd
            | TWhile
            | TDo
+           | TSkip
            | TProgram
            | TIs
            | TForall
