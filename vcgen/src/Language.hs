@@ -56,7 +56,7 @@ data Comparison = Comp Order AExp AExp
 instance Show Comparison where
   show (Comp ord e1 e2) = printf "(%s %s %s)" (show ord) (show e1) (show e2)
 
--- | Boolean AExpressions 
+-- Boolean AExpressions 
 data BExp = BCmp Comparison
           | BNot BExp
           | BBinOp BOp BExp BExp

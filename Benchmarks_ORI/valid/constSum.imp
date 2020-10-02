@@ -1,4 +1,4 @@
-program arrAssign
+program constSum
   pre N > 0
   post forall i, 0 <= i && i < N ==> a[i] = i
 is

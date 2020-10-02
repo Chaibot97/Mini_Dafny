@@ -1,30 +1,21 @@
 #!/bin/bash
 
-suites=(valid invalid)
-for suite in "${suites[@]}"
-do
-  find ../Benchmarks/$suite -name "*.imp" | while read t
-  do
-    printf "$t >>> "
-    out=$(./vcgen.sh "$t")
-    if [[ $suite == valid && $out == "Verified" ]] || [[ $suite == invalid && $out == "Not verified" ]]; then
-      echo ok
-    else
-      echo failed
-    fi
+suites=("../Benchmarks" "../Benchmarks_ORI")
+cases=(valid invalid)
+valid_msg="Verified"
+invalid_msg="Not verified"
+for suite in "${suites[@]}"; do
+  seq  -f "-" -s "" 50
+  echo "$suite"
+  for case in "${cases[@]}"; do
+    find "$suite"/$case -name "*.imp" | while read t; do
+      printf "$t >>> "
+      out=$(./vcgen.sh "$t")
+      if [[ $case == valid && "$out" == "$valid_msg" ]] || [[ "$case" == invalid && "$out" == "$invalid_msg" ]]; then
+        echo ok
+      else
+        echo failed / timeout
+      fi
+    done
   done
 done
-
-seq  -f "-" -s "" 80 
-echo "Original Tests"
-
-find ../Benchmarks_ORI -name "*.imp" | while read t
-  do
-    printf "$t >>> "
-    out=$(./vcgen.sh "$t")
-    if [[ $out = "Verified" ]]; then
-      echo ok
-    else
-      echo failed
-    fi
-  done

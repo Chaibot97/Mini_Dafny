@@ -12,7 +12,7 @@ vc=$(cabal -v0 new-run vcgen "$1")
 if [ "$?" -ne "0" ]; then
     echo Failed
     echo "$vc"
-elif [ "$2" == "-v" ]; then
+elif [ "$2" == "-v" ]; then # print verification condition only
     echo "$vc"
 else
     out=$(echo "$vc" | z3 -in -t:1000)
