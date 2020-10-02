@@ -1,0 +1,6 @@
+program nameCollision
+post true
+is
+    a := 0;
+    a[0] := 0;
+end

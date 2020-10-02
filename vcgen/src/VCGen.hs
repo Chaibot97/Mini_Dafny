@@ -3,8 +3,8 @@ module Main (main) where
 import Language
 import Parser.Parser ( parseProg )
 
-import Data.List ( intercalate, filter, notElem )
-import qualified Data.Set as S ( Set, empty, singleton, union, fromList, toList ) 
+import Data.List ((\\),  intercalate, filter, notElem )
+import qualified Data.Set as S (intersection,  Set, empty, singleton, union, difference, fromList, toList, filter, map, foldl ) 
 import Text.Printf ( printf )
 import System.Environment ( getArgs )
 import Debug.Trace ( trace )
@@ -17,9 +17,9 @@ fresh = map (\i -> "_t" ++ show i) [1..]
 -- return (a, rest of the names)
 -- Inspired by https://stackoverflow.com/a/44802556
 -- TODO: Implement using Traversable
-type NeedFreshNames a = [Name] -> (a, [Name])
+type NeedFreshVars a = [Name] -> (a, [Name])
 
-fold_fv :: (a -> NeedFreshNames [b]) -> [a] -> NeedFreshNames [b]
+fold_fv :: (a -> NeedFreshVars [b]) -> [a] -> NeedFreshVars [b]
 fold_fv f [] fv = ([], fv)
 fold_fv f (x:xs) fv = (y ++ ys, fv'') where
   (y, fv') = f x fv
@@ -83,7 +83,7 @@ bexp_to_assert (BBinOp op b1 b2) = ABinOp op b1' b2' where
   b1' = bexp_to_assert b1
   b2' = bexp_to_assert b2
 
-stmt_to_gc :: Statement -> NeedFreshNames GCBlock
+stmt_to_gc :: Statement -> NeedFreshVars GCBlock
 stmt_to_gc (Assign x e) fv =
   ([ GCAssume (ACmp (Comp Eq v_tmp v_x))
     , GCHavoc (x, Int)
@@ -123,10 +123,10 @@ stmt_to_gc (While b invs c) fv =
     (gc, fv') = prog_to_gc c fv
 stmt_to_gc Skip fv = ([], fv)
 
-prog_to_gc :: Block -> NeedFreshNames GCBlock
+prog_to_gc :: Block -> NeedFreshVars GCBlock
 prog_to_gc = fold_fv stmt_to_gc
 
-wp :: GuardedCommand -> Assertion -> NeedFreshNames Assertion
+wp :: GuardedCommand -> Assertion -> NeedFreshVars Assertion
 wp gc q fv =
   -- Uncomment the following line to enable debug messages
   -- trace (intercalate "\n" ["Command:", show gc, "Message:", msg, "WP:", show q', "Q:", show q, "\n"])
@@ -157,7 +157,7 @@ split_last l = case reverse l of
   [] -> error "list must be non-empty"
   hd:tl -> (reverse tl, hd)
 
-wp_block :: GCBlock -> Assertion -> NeedFreshNames Assertion
+wp_block :: GCBlock -> Assertion -> NeedFreshVars Assertion
 wp_block [] q fv = (q, fv)
 wp_block (hd:tl) q0 fv0 = (q2, fv2) where
   (q1, fv1) = wp_block tl q0 fv0
@@ -217,6 +217,20 @@ to_smt (AQ q xs s) = printf "(%s (%s) %s)" (show q) xts (to_smt s) where
   xts = typing_to_str (zip xs (repeat Int))
 to_smt s = show s -- ATrue and AFalse
 
+
+fix_collision :: Assertion -> NeedFreshVars (Assertion, Typing)
+fix_collision vc fv =
+  -- trace ("Bad: " ++ show ints_bad ++ "\n" ++ show vc ++ "\n\n" ++ show vc')
+  ((vc', ts'), fv') where
+    ts = (S.fromList (infer vc))
+    ints = S.map fst $ S.filter (\(x,t) -> t == Int) ts
+    arrs = S.map fst $ S.filter (\(x,t) -> t == IntArr) ts
+    common = ints `S.intersection` arrs
+    ints_bad = zip (S.toList common) (repeat Int) :: Typing -- int variables that collide with array variables
+    (vs, fv') = splitAt (length common) fv -- new names for xs
+    vc' = foldl (\s (v,(x,t)) -> subst_assert (Var v) (x,t) s) vc (zip vs ints_bad)
+    ts' = (S.toList ts \\ ints_bad) ++ zip vs (repeat Int)
+
 main :: IO ()
 main = do
   as <- getArgs
@@ -227,12 +241,13 @@ main = do
     (gc, fv1) = prog_to_gc (block p) fv0
     (weakest, fv2) = wp_block gc (conj $ post p) fv1
     vc = (ANot (ABinOp Imply (conj $ pre p) weakest))
-    ts = S.toList (S.fromList (infer vc)) -- remove duplicates
+    ((vc', ts), fv3) = fix_collision vc fv2
     declare_str :: (Name, Type) -> String
     declare_str (x,t) = printf "(declare-const %s %s)" x (show t)
     ds = map declare_str ts
+
   -- putStrLn (intercalate "\n" (gcblock_strlist gc)) -- print GC program
   putStrLn "(set-logic ALL)"
   putStrLn (intercalate "\n" ds)
-  putStrLn ("(assert " ++  to_smt vc ++ ")")
+  putStrLn ("(assert " ++  to_smt vc' ++ ")")
   putStrLn "(check-sat)"

@@ -1,0 +1,15 @@
+program constSum_nameCollision
+  pre N > 0
+  post forall i, 0 <= i && i < N ==> a[i] = i
+is
+  a[0] := 0;
+  a := 1;
+  while a < N
+    inv a <= N
+    inv a >= 1
+    inv forall j, 0 <= j && j < a ==> a[j] = j
+  do
+    a[a] := a[a-1] + 1;
+    a := a + 1;
+  end
+end
