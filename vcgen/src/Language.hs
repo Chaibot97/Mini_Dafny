@@ -10,7 +10,7 @@ instance Show AOp where
   show Add = "+"
   show Sub = "-"
   show Mul = "*"
-  show Div = "/"
+  show Div = "div"
   show Mod = "mod"
 
 data BOp = And | Or | Imply
@@ -85,7 +85,8 @@ instance Show Assertion where
 
 -- Program statements
 type Block = [Statement]
-data Statement = Assign Typed AExp
+data Statement = Assign Name AExp
+               | Write Name AExp AExp
                | ParAssign Name Name AExp AExp
                | If BExp Block Block
                | While BExp [Assertion] Block
@@ -93,8 +94,9 @@ instance Show Statement where
   show s = intercalate "\n" (show_list s)
 
 show_list :: Statement -> [String]
-show_list (Assign (x,_) e) = [x ++ " := " ++ show e ++ ";"]
+show_list (Assign x e) = [x ++ " := " ++ show e ++ ";"]
 show_list (ParAssign x y ex ey) = [x ++ ", " ++ y ++ " := " ++ show ex ++ ", " ++ show ey ++ ";"]
+show_list (Write a ei ev) = [printf "%s[%s] := %s" a (show ei) (show ev)]
 show_list (If b c1 c2) =
   [ "if " ++ show b
   , "then" ] ++

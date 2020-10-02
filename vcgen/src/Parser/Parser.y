@@ -141,9 +141,9 @@ assertion :: { Assertion }
           {- | '(' assertion ')' { AParens $2} -}
 
 stmt :: { Statement }
-     : name ":=" arithExp ';' { Assign ($1,Int) $3 }
+     : name ":=" arithExp ';' { Assign $1 $3 }
      | name ',' name ":=" arithExp ',' arithExp ';' { ParAssign $1 $3 $5 $7 }
-     | name '[' arithExp ']' ":=" arithExp ';' { Assign ($1,IntArr) (Store (Arr $1) $3 $6) }
+     | name '[' arithExp ']' ":=" arithExp ';' { Write $1 $3 $6 }
      | "if" boolExp "then" block "else" block "end" { If $2 $4 $6 }
      | "if" boolExp "then" block "end" { If $2 $4 [] }
      | "while" boolExp list(inv) "do" block "end" { While $2 $3 $5 }

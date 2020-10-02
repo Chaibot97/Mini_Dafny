@@ -54,10 +54,15 @@ subst_assert new (old,t) s = let subst = subst_assert new (old,t) in
     ACmp c -> ACmp (subst_cmp new (old,t) c)
     ANot s' -> ANot (subst s')
     ABinOp op b1 b2 -> ABinOp op (subst b1) (subst b2)
-    AQ q xs s' -> if elem old xs then s else AQ q xs (subst s')
+    AQ q xs s' -> AQ q xs s'' where
+      s'' = case t of 
+        Int -> if elem old xs then s' else (subst s')
+        IntArr -> (subst s')
+    _ -> s
 
 modified :: Statement -> S.Set Typed
-modified (Assign (x,t) _)  = S.singleton (x, t)
+modified (Assign x _)  = S.singleton (x, Int)
+modified (Write a _ _) = S.singleton (a, IntArr)
 modified (If _ c1 c2)  = S.union (block_modified c1) (block_modified c2)
 modified (While _ _ c) = block_modified c
 
@@ -77,31 +82,35 @@ bexp_to_assert (BBinOp op b1 b2) = ABinOp op b1' b2' where
   b2' = bexp_to_assert b2
 
 stmt_to_gc :: Statement -> NeedFreshNames GCBlock
-stmt_to_gc (Assign (x,t) e) fv0 = case t of
-  Int ->
+stmt_to_gc (Assign x e) fv0 =
     ([ GCAssume (ACmp (Comp Eq v_xf v_x))
-     , GCHavoc (x,t)
-     , GCAssume (ACmp (Comp Eq v_x (subst_aexp v_xf (x,t) e))) ], fv1) where
+     , GCHavoc (x, Int)
+     , GCAssume (ACmp (Comp Eq v_x (subst_aexp v_xf (x,Int) e))) ], fv1) where
         (xf : fv1) = fv0
         v_xf = Var xf
         v_x  = Var x
-  IntArr ->
+stmt_to_gc (Write a (Var ind) (Var val)) fv0 =
     ([ GCAssume (arr_equal (Arr a') (Arr a) i)
-     , GCHavoc (x,t)
-     , GCAssume (arr_equal (Arr a) e' j) ], fv3) where
-        a = x
+     , GCHavoc (a, IntArr)
+     , GCAssume (arr_equal (Arr a) store j) ], fv3) where
         a' : fv1 = fv0
         i : fv2 = fv1
         j : fv3 = fv2
-        e' = subst_aexp (Arr a') (x,t) e
+        store = Store (Arr a') (Var ind) (Var val)
         arr_equal a1 a2 i = AQ Forall [i] (ACmp (Comp Eq (Read a1 (Var i)) (Read a2 (Var i))))
+stmt_to_gc (Write a ei ev) fv0 = 
+    prog_to_gc [ Assign ind ei
+     , Assign val ev
+     , Write a (Var ind) (Var val)] fv2 where
+       ind : fv1 = fv0
+       val : fv2 = fv1
 stmt_to_gc (ParAssign x1 x2 e1 e2) fv0 = (gc, fv3) where
   v1 : fv1 = fv0
   v2 : fv2 = fv1
-  (gc, fv3) = prog_to_gc [ Assign (v1,Int) e1
-              , Assign (v2,Int) e2
-              , Assign (x1,Int) (Var v1)
-              , Assign (x2,Int) (Var v2) ] fv2
+  (gc, fv3) = prog_to_gc [ Assign v1 e1
+              , Assign v2 e2
+              , Assign x1 (Var v1)
+              , Assign x2 (Var v2) ] fv2
 stmt_to_gc (If b c1 c2) fv =
     ([ GCChoice (GCAssume bs : gc1) (GCAssume (ANot bs) : gc2) ], fv'') where
         (gc1, fv')  = prog_to_gc c1 fv
@@ -124,7 +133,7 @@ prog_to_gc = fold_fv stmt_to_gc
 wp :: GuardedCommand -> Assertion -> NeedFreshNames Assertion
 wp gc q fv =
   -- Uncomment the following line to enable debug messages
-  -- trace (intercalate "\n" ["Command:", show gc, "Message:", msg, "WP:", show qq, "Q:", show q, "\n"])
+  -- trace (intercalate "\n" ["Command:", show gc, "Message:", msg, "WP:", show q', "Q:", show q, "\n"])
   (q', fv') where
     (q', fv', msg) = case gc of
       GCAssert s -> case q of
@@ -225,6 +234,7 @@ main = do
     declare_str :: (Name, Type) -> String
     declare_str (x,t) = printf "(declare-const %s %s)" x (show t)
     ds = map declare_str ts
+  -- putStrLn (intercalate "\n" (gcblock_strlist gc))
   putStrLn "(set-logic ALL)"
   putStrLn (intercalate "\n" ds)
   putStrLn ("(assert " ++  to_smt vc ++ ")")
