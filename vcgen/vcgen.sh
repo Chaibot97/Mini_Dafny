@@ -15,7 +15,7 @@ if [ "$?" -ne "0" ]; then
 elif [ "$2" == "-v" ]; then # print verification condition only
     echo "$vc"
 else
-    out=$(echo "$vc" | z3 -in -t:1000)
+    out=$(echo "$vc" | z3 -in -t:3000)
     if [ "$out" = sat ]; then
         echo Not verified
     elif [ "$out" = unsat ]; then
