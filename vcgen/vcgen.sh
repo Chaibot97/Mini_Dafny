@@ -8,14 +8,14 @@ if ! command -v cabal &> /dev/null; then
     exit
 fi
 
-vc=$(cabal -v0 new-run vcgen "$1")
+vc=$(cabal -v0 new-run vcgen "$1" 2>/dev/null)
 if [ "$?" -ne "0" ]; then
     echo Failed
     echo "$vc"
-elif [ "$2" == "-vc" ]; then # print verification condition only
+elif [ "$2" == "--vc" ]; then # print verification condition only
     echo "$vc"
 else
-    out=$(echo "$vc" | z3 -in -t:3000)
+    out=$(echo "$vc" | z3 -in)
     if [ "$out" = unsat ]; then
         echo Verified
     elif [ "$out" = sat ]; then
