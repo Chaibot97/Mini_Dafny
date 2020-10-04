@@ -1,6 +1,6 @@
-Project1: Veriﬁcation Condition Generation  
+Mini-Dafny  
 ===  
-Author: Lizhou Cai, Junrui Liu  
+Authors: Lizhou Cai, Junrui Liu  
 
 ## Prerequisites
 * cabal v3.2.0.0
@@ -16,8 +16,8 @@ In directory `vcgen/`, run
     ./vcgen.sh IMP_FILE
 
 This will print out either 
-* “Verified” if the IMP program is valid 
-* “Not verified” if the program is invalid
+* `Verified` if the IMP program is valid 
+* `Not verified` if the program is invalid
 
 To prevent z3 from freezing, a three-second timeout is set.
 
