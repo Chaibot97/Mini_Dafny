@@ -56,7 +56,8 @@ import Parser.Lexer
     "false"     { TFalse }
 
 
-%right "forall" "exists"
+%nonassoc "exists"
+%nonassoc "forall"
 %left "==>"
 %left "||"
 %left "&&"
