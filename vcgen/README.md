@@ -1,45 +1,48 @@
 Project1: Veriﬁcation Condition Generation  
-Author: Lizhou Cai, Junrui Liu  
 ===  
+Author: Lizhou Cai, Junrui Liu  
 
-## VCGen
-To run the VCGen, installation of ___Haskell___ and ___z3___ are required.
+## Prerequisites
+* cabal v3.2.0.0
+* z3 v4.8.9
 
-If both of them are installed, `cd` to `/vcgen` and run
-    
-    ./vcgen.sh [path_to_imp]
-    
-will print out either 
-* “verified” if the imp program is valid 
+## Building
+`cd` to `vcgen/` and run `make vcgen`.
+
+## Usage
+
+In directory `vcgen/`, run
+
+    ./vcgen.sh IMP_FILE
+
+This will print out either 
+* “Verified” if the IMP program is valid 
 * “Not verified” if the program is invalid
 
-To avoid z3 to freeze, 3 secound timeout is set.
+To prevent z3 from freezing, a three-second timeout is set.
 
-We are currently using z3 version 4.8.9 and it has some bugs that cause the program to hang indefinitely for some test case (e.g. gcd.imp).
+We are currently using z3 version 4.8.9 and it has some bugs that cause the program to hang indefinitely for some test case (e.g. `gcd.imp`).
 However, the version of z3 used in <https://rise4fun.com/z3/> is working fine.
 
-In this case, by running
+In this case, run the program with option `-vc`:
 
-    ./vcgen.sh [path_to_imp] -v > output.smt2
+    ./vcgen.sh IMP_FILE -vc
 
-you will be able to get the intermidiate `not(WP)` in the _smt2_ format and copy and paste it into the oneline z3 solver to get the correct result. (unsat-> valid, sat ->invalid) 
+This will print out the negation of the verification condition in the `SMT-LIB` (version 2) format. You can paste it into the online z3 solver to get the correct result (`unsat` -> valid, `sat` -> invalid).
 
 
 ---
 ## Benchmarking
-Benchmarks given by TA can be found at the directory `/Benchmarks`, while orginal benchmarks are in `/Benchmarks_ORI`.
+The official benchmarks can be found in `Benchmarks/`, while our original benchmarks are in `Benchmarks_ORI/`.
 
-Test files are divided into two subdirectories `/Benchmarks_ORI/valid` and `/Benchmarks_ORI/invalid` accroding to their validity.
+Test files are further partitioned into `valid` and `invalid` according to the program's validity.
 
 To run all the tests, simply run
 
     ./test.sh
 
-* It wil output `ok` if its output is consistent with its the directory.
-* It wil output `failed` otherwise.
+For every `.imp` test file, it will output
+* `ok` if the z3 output is consistent with expectation.
+* `failed / timeout` otherwise.
 
-(Test _gcd.imp_ will timeout because of  z3v4.8.9's bug, but all the other test will pass)
-
-
-
-
+(Test `gcd.imp` will timeout because of z3v4.8.9's bug, but all the other tests should pass.)
