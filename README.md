@@ -16,8 +16,8 @@ In directory `vcgen/`, run
     ./vcgen.sh IMP_FILE
 
 This will print out either 
-* `Verified` if the IMP program is valid 
-* `Not verified` if the program is invalid
+* `Verified` if the IMP program is valid, i.e. the specified precondition implies the weakest precondition computed by mini-Dafny, or
+* `Not verified` if the program is invalid, or there was an error (such as a parser error).
 
 To prevent z3 from freezing, a three-second timeout is set.
 
