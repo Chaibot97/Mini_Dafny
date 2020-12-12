@@ -58,7 +58,7 @@ import Parser.Lexer
 
 %nonassoc "exists"
 %nonassoc "forall"
-%left "==>"
+%right "==>"
 %left "||"
 %left "&&"
 %left '!'
